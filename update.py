@@ -99,3 +99,6 @@ print(
 
 print()
 print("Saved             : openai_test.wav")
+
+
+curl -X POST "https://qwen3-tts-150916788856.us-central1.run.app/v1/audio/speech" -H "Content-Type: application/json" -d "{\"model\":\"qwen3-tts-0.6b\",\"input\":\"I cannot believe we finally made it!\",\"voice\":\"Aiden\",\"instructions\":\"Speak happily and with excitement.\",\"response_format\":\"wav\",\"speed\":1.0,\"language\":\"English\"}" --output openai_test.wav
