@@ -1,0 +1,11 @@
+# Server/application dependencies.
+# NVIDIA NeMo/Speech and model-specific packages are installed in Dockerfile
+# from the official nemotron-labs-voicechat branch.
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+soundfile
+requests
+websockets
+sounddevice
