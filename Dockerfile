@@ -191,6 +191,6 @@ WORKDIR /app
 
 COPY server.py /app/server.py
 
-EXPOSE 8000
+EXPOSE 8001
 
 CMD ["python", "server.py"]
