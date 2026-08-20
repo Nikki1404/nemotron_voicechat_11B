@@ -20,8 +20,6 @@ ENV PYTHONUNBUFFERED=1 \
     PATH=/opt/conda/bin:/usr/local/cuda-12.4/bin:${PATH} \
     LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:${LD_LIBRARY_PATH}
 
-# System/runtime dependencies plus CUDA build tooling needed by
-# causal-conv1d and mamba-ssm.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -35,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
 
-# NVIDIA's published VoiceChat setup uses Python 3.12.
+# Python 3.12
 RUN curl -fsSL \
       https://repo.anaconda.com/miniconda/Miniconda3-py312_25.5.1-1-Linux-x86_64.sh \
       -o /tmp/miniconda.sh \
@@ -45,7 +43,7 @@ RUN curl -fsSL \
 
 WORKDIR /opt
 
-# NVIDIA's dedicated NemotronLabs VoiceChat branch.
+# NVIDIA NemotronLabs VoiceChat branch
 RUN git clone \
     --branch nemotron-labs-voicechat \
     --depth 1 \
@@ -56,18 +54,25 @@ WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
 
-# Install the complete server/model Python stack from requirements.txt.
-# --no-build-isolation lets the CUDA extensions build against installed Torch.
+# Install all Python dependencies.
+# IMPORTANT: do NOT append "|| true" here.
 RUN python -m pip install \
       --no-build-isolation \
-      -r /app/requirements.txt \
-    && python -m pip uninstall -y nvidia-resiliency-ext || true
+      -r /app/requirements.txt
 
-# Download the Hugging Face checkpoint into the Docker image.
+# This package can be removed if installed by NeMo.
+# Failure to uninstall should not fail the image.
+RUN python -m pip uninstall -y nvidia-resiliency-ext || true
+
+# Verify critical dependencies before downloading the 11B model.
+RUN python -c "import torch; import huggingface_hub; print('Torch:', torch.__version__); print('CUDA:', torch.version.cuda); print('HF Hub:', huggingface_hub.__version__)"
+
+# Download model from Hugging Face during Docker build.
 # No Hugging Face token is used.
 RUN mkdir -p ${MODEL_DIR} \
-    && hf download ${MODEL_ID} \
-       --local-dir ${MODEL_DIR}
+    && python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='${MODEL_ID}', local_dir='${MODEL_DIR}')"
+
+WORKDIR /app
 
 COPY server.py /app/server.py
 
