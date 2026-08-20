@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 
+ENV http_proxy="http://163.116.128.80:8080"
+ENV https_proxy="http://163.116.128.80:8080"
+
 ARG DEBIAN_FRONTEND=noninteractive
 ARG MODEL_ID=nvidia/NVIDIA-NemotronLabs-VoiceChat-11B
 ARG MODEL_DIR=/app/models/NVIDIA-NemotronLabs-VoiceChat-11B
