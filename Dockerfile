@@ -20,6 +20,10 @@ ENV PYTHONUNBUFFERED=1 \
     PATH=/opt/conda/bin:/usr/local/cuda-12.4/bin:${PATH} \
     LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:${LD_LIBRARY_PATH}
 
+# ---------------------------------------------------------------------------
+# System dependencies
+# ---------------------------------------------------------------------------
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -33,7 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
 
-# Python 3.12
+# ---------------------------------------------------------------------------
+# Python 3.12 environment
+# ---------------------------------------------------------------------------
+
 RUN curl -fsSL \
       https://repo.anaconda.com/miniconda/Miniconda3-py312_25.5.1-1-Linux-x86_64.sh \
       -o /tmp/miniconda.sh \
@@ -41,36 +48,144 @@ RUN curl -fsSL \
     && rm -f /tmp/miniconda.sh \
     && python -m pip install --upgrade pip setuptools wheel
 
+# ---------------------------------------------------------------------------
+# Clone NVIDIA VoiceChat branch
+# ---------------------------------------------------------------------------
+
 WORKDIR /opt
 
-# NVIDIA NemotronLabs VoiceChat branch
 RUN git clone \
     --branch nemotron-labs-voicechat \
     --depth 1 \
     https://github.com/NVIDIA-NeMo/Speech.git \
     /opt/Speech
 
+WORKDIR /opt/Speech
+
+# ---------------------------------------------------------------------------
+# Install Torch first
+#
+# Torch is intentionally NOT in requirements.txt.
+# causal-conv1d and mamba-ssm import Torch during build/metadata generation.
+# ---------------------------------------------------------------------------
+
+RUN python -m pip install \
+    torch==2.10.0 \
+    torchvision==0.25.0 \
+    torchaudio==2.10.0
+
+RUN python -c "\
+import torch; \
+print('========================================'); \
+print('Torch before NeMo:', torch.__version__); \
+print('Torch CUDA:', torch.version.cuda); \
+print('CUDA available:', torch.cuda.is_available()); \
+print('========================================')"
+
+# ---------------------------------------------------------------------------
+# Install NVIDIA NeMo VoiceChat stack
+# ---------------------------------------------------------------------------
+
+RUN python -m pip install -e ".[all]"
+
+# This dependency is not required for our standalone app.
+RUN python -m pip uninstall -y nvidia-resiliency-ext || true
+
+# ---------------------------------------------------------------------------
+# Force Torch versions again AFTER NeMo
+#
+# NeMo dependency resolution may install/change Torch-related packages.
+# This guarantees the final Torch stack we want.
+# ---------------------------------------------------------------------------
+
+RUN python -m pip install \
+    --upgrade \
+    --force-reinstall \
+    torch==2.10.0 \
+    torchvision==0.25.0 \
+    torchaudio==2.10.0
+
+RUN python -c "\
+import torch, torchvision, torchaudio; \
+print('========================================'); \
+print('Torch after NeMo:', torch.__version__); \
+print('Torchvision:', torchvision.__version__); \
+print('Torchaudio:', torchaudio.__version__); \
+print('Torch CUDA:', torch.version.cuda); \
+print('========================================')"
+
+# ---------------------------------------------------------------------------
+# Application dependencies
+# ---------------------------------------------------------------------------
+
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
 
-# Install all Python dependencies.
-# IMPORTANT: do NOT append "|| true" here.
 RUN python -m pip install \
-      --no-build-isolation \
-      -r /app/requirements.txt
+    -r /app/requirements.txt
 
-# This package can be removed if installed by NeMo.
-# Failure to uninstall should not fail the image.
-RUN python -m pip uninstall -y nvidia-resiliency-ext || true
+# Make sure Torch is still available before building CUDA extensions.
+RUN python -c "\
+import torch; \
+print('Torch before CUDA extensions:', torch.__version__); \
+print('Torch CUDA:', torch.version.cuda)"
 
-# Verify critical dependencies before downloading the 11B model.
-RUN python -c "import torch; import huggingface_hub; print('Torch:', torch.__version__); print('CUDA:', torch.version.cuda); print('HF Hub:', huggingface_hub.__version__)"
+# ---------------------------------------------------------------------------
+# CUDA extensions
+#
+# Keep these OUT of requirements.txt.
+# They need Torch already installed and must build against the current env.
+# ---------------------------------------------------------------------------
 
-# Download model from Hugging Face during Docker build.
-# No Hugging Face token is used.
+RUN python -m pip install \
+    --no-build-isolation \
+    --no-deps \
+    causal-conv1d==1.6.2.post1 \
+    mamba-ssm==2.3.2.post1
+
+# ---------------------------------------------------------------------------
+# Final dependency verification
+# ---------------------------------------------------------------------------
+
+RUN python -c "\
+import torch; \
+import torchvision; \
+import torchaudio; \
+import huggingface_hub; \
+import causal_conv1d; \
+import mamba_ssm; \
+print('========================================'); \
+print('FINAL ENVIRONMENT'); \
+print('========================================'); \
+print('torch:', torch.__version__); \
+print('torchvision:', torchvision.__version__); \
+print('torchaudio:', torchaudio.__version__); \
+print('torch CUDA:', torch.version.cuda); \
+print('CUDA available:', torch.cuda.is_available()); \
+print('huggingface_hub:', huggingface_hub.__version__); \
+print('causal_conv1d: OK'); \
+print('mamba_ssm: OK'); \
+print('========================================')"
+
+# ---------------------------------------------------------------------------
+# Download Nemotron VoiceChat model during Docker build
+#
+# No Hugging Face token.
+# Use snapshot_download instead of relying on the `hf` CLI.
+# ---------------------------------------------------------------------------
+
 RUN mkdir -p ${MODEL_DIR} \
-    && python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='${MODEL_ID}', local_dir='${MODEL_DIR}')"
+    && python -c "\
+from huggingface_hub import snapshot_download; \
+snapshot_download( \
+    repo_id='${MODEL_ID}', \
+    local_dir='${MODEL_DIR}' \
+)"
+
+# ---------------------------------------------------------------------------
+# Application
+# ---------------------------------------------------------------------------
 
 WORKDIR /app
 
