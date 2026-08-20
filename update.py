@@ -102,3 +102,6 @@ print("Saved             : openai_test.wav")
 
 
 curl -X POST "https://qwen3-tts-150916788856.us-central1.run.app/v1/audio/speech" -H "Content-Type: application/json" -d "{\"model\":\"qwen3-tts-0.6b\",\"input\":\"I cannot believe we finally made it!\",\"voice\":\"Aiden\",\"instructions\":\"Speak happily and with excitement.\",\"response_format\":\"wav\",\"speed\":1.0,\"language\":\"English\"}" --output openai_test.wav
+
+{"message": "failed to synthesize speech: no audio frames were pushed for text: Hello, retrying in 2.0s", "level": "WARNING", "name": "livekit.agents", "tts": "livekit.plugins.openai.tts.TTS", "attempt": 3, "streamed": false, "eval_job_id": "run_af7ffa98", "scenario_id": "f29b843e-97c4-11f1-8d8d-42004e494300", "tenant_id": "default", "pid": 35, "job_id": "AJ_RYjUkiQ7ZSuH", "room": "aqa-f29b843e-97c4-11f1-8d8d-42004e494300-2b33d253", "timestamp": "2026-08-20T09:11:05.655372+00:00"}
+ 
