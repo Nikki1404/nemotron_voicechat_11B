@@ -12,9 +12,6 @@ packaging
 wheel
 einops
 
-causal-conv1d==1.6.2.post1
-mamba-ssm==2.3.2.post1
-
 fastapi
 uvicorn[standard]
 python-multipart
