@@ -1,51 +1,101 @@
-(base) root@EC03-E01-AICOE1:/home/CORP/re_nikitav/nemotron_voicechat_11B# docker run --rm -it   --gpus all   --ipc=host   --shm-size=8g  -e MIN_GPU_VRAM_GB=0 -p 8001:8001   nemotron-voicechat:latest
+import time
+import requests
 
-==========
-== CUDA ==
-==========
+url = "https://qwen3-tts-150916788856.us-central1.run.app/v1/audio/speech"
 
-CUDA Version 12.4.1
+payload = {
+    "model": "qwen3-tts-0.6b",
+    "input": "I cannot believe we finally made it!",
+    "voice": "Aiden",
+    "instructions": "Speak happily and with excitement.",
+    "response_format": "wav",
+    "speed": 1.0,
+    "language": "English",
+}
 
-Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+start = time.perf_counter()
 
-This container image and its contents are governed by the NVIDIA Deep Learning Container License.
-By pulling and using the container, you accept the terms and conditions of this license:
-https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+response = requests.post(
+    url,
+    json=payload,
+    stream=True,
+    timeout=300,
+)
 
-A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+headers_time = time.perf_counter()
 
-/opt/conda/lib/python3.12/site-packages/torch/cuda/__init__.py:65: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-/opt/conda/lib/python3.12/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (1.26.20) or chardet (6.0.0.post1)/charset_normalizer (3.3.2) doesn't match a supported version!
-  warnings.warn(
-[NeMo I 2026-08-20 08:02:49 nemo_logging:394] Triton available & CUDA detected. Using Triton kernel for batch_matmul.
-[NeMo W 2026-08-20 08:02:49 nemo_logging:406] /opt/Speech/nemo/collections/speechlm2/parts/optim_setup.py:93: SyntaxWarning: invalid escape sequence '\.'
-      ... params = freeze_and_subset(model.named_parameters(), ['^llm\..+$'])
+response.raise_for_status()
 
-INFO:     Started server process [1]
-INFO:     Waiting for application startup.
-==========================================================================================
-NVIDIA NemotronLabs VoiceChat 11B
-==========================================================================================
-MODEL_ID        : nvidia/NVIDIA-NemotronLabs-VoiceChat-11B
-MODEL_PATH      : /app/models/NVIDIA-NemotronLabs-VoiceChat-11B
-DEVICE          : cuda
-CUDA available  : True
-GPU             : NVIDIA A10G
-GPU VRAM        : 22.09 GB
-Torch version   : 2.10.0+cu128
-Torch CUDA      : 12.8
+first_audio_time = None
 
-Loading Nemotron VoiceChat model...
-This can take significant time for the 11B checkpoint.
+with open("openai_test.wav", "wb") as f:
 
-config.json: 1.51kB [00:00, 7.41MB/s]
-configuration_nemotron_h.py: 12.2kB [00:00, 47.5MB/s]
-A new version of the following files was downloaded from https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2:
-- configuration_nemotron_h.py
-. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
-modeling_nemotron_h.py: 79.0kB [00:00, 8.97MB/s]
-A new version of the following files was downloaded from https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2:
-- modeling_nemotron_h.py
-. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
-`torch_dtype` is deprecated! Use `dtype` instead!
+    for chunk in response.iter_content(chunk_size=65536):
+
+        if not chunk:
+            continue
+
+        if first_audio_time is None:
+            first_audio_time = time.perf_counter()
+
+        f.write(chunk)
+
+end = time.perf_counter()
+
+
+ttfb_ms = (headers_time - start) * 1000
+
+ttfa_ms = (
+    (first_audio_time - start) * 1000
+    if first_audio_time
+    else None
+)
+
+total_ms = (end - start) * 1000
+
+
+print()
+print("=" * 70)
+print("CLIENT LATENCY")
+print("=" * 70)
+
+print(f"CLIENT TTFB       : {ttfb_ms:.2f} ms")
+
+if ttfa_ms is not None:
+    print(f"CLIENT TTFT/TTFA  : {ttfa_ms:.2f} ms")
+
+print(f"CLIENT TOTAL      : {total_ms:.2f} ms")
+
+
+print()
+print("=" * 70)
+print("SERVER LATENCY")
+print("=" * 70)
+
+print(
+    f"SERVER INFERENCE  : "
+    f"{response.headers.get('X-Server-Inference-MS')} ms"
+)
+
+print(
+    f"SERVER ENCODING   : "
+    f"{response.headers.get('X-Server-Encoding-MS')} ms"
+)
+
+print(
+    f"SERVER TOTAL      : "
+    f"{response.headers.get('X-Server-Total-MS')} ms"
+)
+
+print(
+    f"AUDIO DURATION    : "
+    f"{response.headers.get('X-Audio-Duration-S')} s"
+)
+
+print(
+    f"RTF               : "
+    f"{response.headers.get('X-RTF')}"
+)
+
+print()
+print("Saved             : openai_test.wav")
