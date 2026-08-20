@@ -1,11 +1,43 @@
-# Server/application dependencies.
-# NVIDIA NeMo/Speech and model-specific packages are installed in Dockerfile
-# from the official nemotron-labs-voicechat branch.
+# NVIDIA NemotronLabs VoiceChat 11B - server/model requirements
+#
+# NVIDIA's current model card pins torch 2.10.0 / torchvision 0.25.0 /
+# torchaudio 2.10.0. PyTorch 2.10 publishes CUDA 12.x wheels for cu126,
+# not cu124, so use cu126 wheels with the requested CUDA 12.4.1 base.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+# PyTorch
+torch==2.10.0+cu126
+torchvision==0.25.0+cu126
+torchaudio==2.10.0+cu126
+
+# NeMo Speech branch cloned by Dockerfile
+-e /opt/Speech[all]
+
+# NVIDIA VoiceChat model-card pins
+transformers==4.56.0
+tokenizers==0.22.0
+lhotse==1.32.2
+huggingface-hub==0.34.4
+hf-xet==1.1.9
+torchcodec==0.10.0
+torch_audiomentations
+jinja2
+ninja
+packaging
+wheel
+einops
+
+# CUDA extensions used by the published VoiceChat environment
+causal-conv1d==1.6.2.post1
+mamba-ssm==2.3.2.post1
+
+# API
 fastapi
 uvicorn[standard]
 python-multipart
+
+# Audio / WebSocket / HTTP
 numpy
 soundfile
-requests
 websockets
-sounddevice
+requests

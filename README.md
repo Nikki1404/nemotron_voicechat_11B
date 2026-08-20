@@ -113,6 +113,14 @@ YOU SPEAK <-> MODEL SPEAKS AT THE SAME TIME
 That would require continuous microphone capture, VAD/end-of-turn detection, interruption handling,
 and barge-in logic.
 
+## Dependency layout
+
+- `requirements.txt`: complete Docker/server/model Python dependency set.
+- `client-requirements.txt`: lightweight dependencies for running `client.py` locally.
+- Docker base: `nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04`.
+- Python: 3.12 inside the container.
+- Docker installs the Python dependencies with `pip install --no-build-isolation -r requirements.txt`.
+
 ## Build
 
 ```bash
