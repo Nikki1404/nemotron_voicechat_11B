@@ -145,4 +145,27 @@ The biggest win would be implementing streaming inference if the model supports 
 
 
 
+Dia does not define [S1] = male and [S2] = female. They are speaker identities/turn markers, not gender selectors. The model card explicitly says Dia was not fine-tuned on specific voices, so voices can vary between generations.
+
+Transcript stops early because max_new_tokens=1024 is much too small for the script we are giving , and Dia recommends avoiding very long single generations. Nari Labs says 256 tokens is only about ~2 seconds and recommends keeping generations roughly below 20 seconds for quality.
+[S1] and [S2] do not mean female/male. Dia explicitly says voices can change between runs unless you use audio conditioning or, less reliably, a fixed seed.
+
+Dia’s generation architecture is optimized for relatively short dialogue segments, not arbitrarily long scripts in one decode pass.
+
+There are a few reasons:
+
+Audio tokens grow very quickly. Dia generates audio-token sequences autoregressively. The longer the requested speech, the more tokens it must produce, and generation time grows accordingly.
+max_new_tokens is a hard ceiling. If the model needs more tokens than the limit you set, generation stops even if the text is unfinished.
+Quality degrades on very long contexts. The Dia authors note that very long generations can become faster, less stable, or otherwise degrade in quality. (github.com)
+The model is dialogue-oriented. It was designed around [S1] / [S2] conversational turns. That works best when the model handles manageable spans of dialogue rather than several minutes of speech in one shot.
+Memory and latency scale up. A long single generation keeps more autoregressive state around and delays the first audio until the whole generation completes.
+reference-https://github.com/nari-labs/dia/issues/109
+https://huggingface.co/nari-labs/Dia-1.6B-0626/blob/main/README.md
+https://github.com/nari-labs/dia/blob/main/README.md
+
+                                                                                                                                                                                                                                                                            
+The problem is that long single-pass audio generation becomes token-limited, slow, and less stable, which is why chunking is the safer design which i am tryng now .                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                            
 
